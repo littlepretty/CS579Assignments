@@ -37,10 +37,10 @@ import sys
 import time
 from TwitterAPI import TwitterAPI
 
-consumer_key = 'fixme'
-consumer_secret = 'fixme'
-access_token = 'fixme'
-access_token_secret = 'fixme'
+consumer_key = '7acgVxUXKnzVB33qL54MzDPo5'
+consumer_secret = '4f4JOoXh9Qp9o2KEqikiy4Otw4ykVeEqLwp53yVysfWAywqCAj'
+access_token = '539662706-iCeekVlTJqNcQwz5SvUQYH2hgieUPKGC0TMWxa9M'
+access_token_secret = 'OyMaCno0Kld46iZrhqlpftcJGVvZTv63eBZCh8gT6dbNi'
 
 
 # This method is done for you.
@@ -66,9 +66,12 @@ def read_screen_names(filename):
     >>> read_screen_names('candidates.txt')
     ['DrJillStein', 'GovGaryJohnson', 'HillaryClinton', 'realDonaldTrump']
     """
-    ###TODO
-    pass
+    names = []
+    with open(filename, 'r') as fileContent:
+        for line in fileContent:
+            names.append(line.strip())
 
+    return names
 
 # I've provided the method below to handle Twitter's rate limiting.
 # You should call this method whenever you need to access the Twitter API.
@@ -112,8 +115,15 @@ def get_users(twitter, screen_names):
     >>> [u['id'] for u in users]
     [6253282, 783214]
     """
-    ###TODO
-    pass
+    users = []
+    for name in screen_names:
+        response = robust_request(twitter, 'users/show',
+                                  {'screen_name': name}, max_tries=2)
+        if response is not None:
+            for item in response.get_iterator():
+                users.append(item)
+
+    return users
 
 
 def get_friends(twitter, screen_name):
@@ -137,8 +147,15 @@ def get_friends(twitter, screen_name):
     >>> get_friends(twitter, 'aronwc')[:5]
     [695023, 1697081, 8381682, 10204352, 11669522]
     """
-    ###TODO
-    pass
+    friends = []
+    response = robust_request(twitter, 'friends/list',
+                              {'screen_name': screen_name, 'count': 5000},
+                              max_tries=2)
+    if response is not None:
+        for item in response.get_iterator():
+            friends.append(item['id'])
+
+    return sorted(friends)
 
 
 def add_all_friends(twitter, users):
@@ -159,8 +176,9 @@ def add_all_friends(twitter, users):
     >>> users[0]['friends'][:5]
     [695023, 1697081, 8381682, 10204352, 11669522]
     """
-    ###TODO
-    pass
+    for user in users:
+        friends = get_friends(twitter, user['screen_name'])
+        user['friends'] = friends
 
 
 def print_num_friends(users):
@@ -171,8 +189,9 @@ def print_num_friends(users):
     Returns:
         Nothing
     """
-    ###TODO
-    pass
+    sortedUsers = sorted(users, key=lambda x: len(x['friends']))
+    for user in sortedUsers:
+        print('%s %d' % (user['screen_name'], len(user['friends'])))
 
 
 def count_friends(users):
@@ -188,8 +207,11 @@ def count_friends(users):
     >>> c.most_common()
     [(2, 3), (3, 2), (1, 1)]
     """
-    ###TODO
-    pass
+    c = Counter()
+    for user in users:
+        c.update(user['friends'])
+
+    return c
 
 
 def friend_overlap(users):
@@ -213,8 +235,6 @@ def friend_overlap(users):
     ...     ])
     [('a', 'c', 3), ('a', 'b', 2), ('b', 'c', 2)]
     """
-    ###TODO
-    pass
 
 
 def followed_by_hillary_and_donald(users, twitter):
