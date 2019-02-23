@@ -92,7 +92,7 @@ def robust_request(twitter, resource, params, max_tries=5):
         if request.status_code == 200:
             return request
         else:
-            print('Got error %s \nsleeping for 15 minutes.' % request.text)
+            print('Got error %s for %s\nsleeping for 15 minutes.' % (request.text, resource))
             sys.stderr.flush()
             time.sleep(61 * 15)
 
@@ -117,8 +117,7 @@ def get_users(twitter, screen_names):
     """
     users = []
     for name in screen_names:
-        response = robust_request(twitter, 'users/show',
-                                  {'screen_name': name}, max_tries=2)
+        response = robust_request(twitter, 'users/show', {'screen_name': name})
         if response is not None:
             for item in response.get_iterator():
                 users.append(item)
@@ -149,8 +148,7 @@ def get_friends(twitter, screen_name):
     """
     friends = []
     response = robust_request(twitter, 'friends/list',
-                              {'screen_name': screen_name, 'count': 5000},
-                              max_tries=2)
+                              {'screen_name': screen_name, 'count': 200, 'skip_status': 'true'})
     if response is not None:
         for item in response.get_iterator():
             friends.append(item['id'])
@@ -235,6 +233,15 @@ def friend_overlap(users):
     ...     ])
     [('a', 'c', 3), ('a', 'b', 2), ('b', 'c', 2)]
     """
+    overlaps = []
+    for i in range(len(users)):
+        for j in range(i + 1, len(users)):
+            u1, u2 = users[i], users[j]
+            friends1, friends2 = set(u1['friends']), set(u2['friends'])
+            numOverlap = len(friends1 & friends2)
+            overlaps.append((u1['screen_name'], u2['screen_name'], numOverlap))
+
+    return sorted(overlaps, key=lambda x: (-x[2], x[0], x[1]))
 
 
 def followed_by_hillary_and_donald(users, twitter):
@@ -251,8 +258,24 @@ def followed_by_hillary_and_donald(users, twitter):
         A list of strings containing the Twitter screen_names of the users
         that are followed by both Hillary Clinton and Donald Trump.
     """
-    ###TODO
-    pass
+    commonFriendIds = None
+    for user in users:
+        friends = get_friends(twitter, user['screen_name'])
+        if commonFriendIds is None:
+            commonFriendIds = set(friends)
+        else:
+            commonFriendIds &= set(friends)
+
+        print(','.join(list(commonFriendIds)))
+
+    ids = ','.join(list(commonFriendIds))
+    names = []
+    response = robust_request(twitter, 'users/lookup', {'user_id': ids})
+    if response is not None:
+        for item in response.get_iterator():
+            names.append(item['screen_name'])
+
+    return names
 
 
 def create_graph(users, friend_counts):
@@ -270,8 +293,14 @@ def create_graph(users, friend_counts):
     Returns:
       A networkx Graph
     """
-    ###TODO
-    pass
+    g = nx.Graph()
+    for user in users:
+        g.add_node(user['screen_name'])
+        for friend in user['friends']:
+            if friend_counts[friend] > 1:
+                g.add_edge(user['screen_name'], friend)
+
+    return g
 
 
 def draw_network(graph, users, filename):
@@ -284,8 +313,10 @@ def draw_network(graph, users, filename):
     Your figure does not have to look exactly the same as mine, but try to
     make it look presentable.
     """
-    ###TODO
-    pass
+    plt.subplot(111)
+    nx.draw(graph, with_labels=False)
+    nx.draw_networkx_labels(graph, {user['screen_name'] for user in users})
+    plt.savefig('network_yjq.png', fmt='png')
 
 
 def main():
