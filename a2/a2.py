@@ -91,8 +91,24 @@ def tokenize(doc, keep_internal_punct=False):
     >>> tokenize("Hi there! Isn't this fun? ", keep_internal_punct=True)
     array(['hi', 'there', "isn't", 'this', 'fun'], dtype='<U5')
     """
-    ###TODO
-    pass
+    tokens = []
+    doc = doc.lower()
+    if keep_internal_punct is True:
+        words = doc.split()
+        for w in words:
+            token = ""
+            if w[-1] in string.punctuation:
+                token = w[:-1]
+            else:
+                token = w
+            if len(token) > 0:
+                tokens.append(token)
+    else:
+        r = re.compile(r'[\s{}]+'.format(re.escape(string.punctuation)))
+        tokens = r.split(doc)
+        tokens = [w for w in tokens if len(w) > 0]
+
+    return np.array(tokens)
 
 
 def token_features(tokens, feats):
@@ -113,8 +129,8 @@ def token_features(tokens, feats):
     >>> sorted(feats.items())
     [('token=hi', 2), ('token=there', 1)]
     """
-    ###TODO
-    pass
+    for token in tokens:
+        feats['token=' + token] += 1
 
 
 def token_pair_features(tokens, feats, k=3):
@@ -143,8 +159,10 @@ def token_pair_features(tokens, feats, k=3):
     >>> sorted(feats.items())
     [('token_pair=a__b', 1), ('token_pair=a__c', 1), ('token_pair=b__c', 2), ('token_pair=b__d', 1), ('token_pair=c__d', 1)]
     """
-    ###TODO
-    pass
+    for i in range(0, len(tokens) - k + 1):
+        tokenInWindow = tokens[i: i + k]
+        for pair in combinations(tokenInWindow, 2):
+            feats['token_pair=' + pair[0] + '__' + pair[1]] += 1
 
 
 neg_words = set(['bad', 'hate', 'horrible', 'worst', 'boring'])
@@ -169,8 +187,13 @@ def lexicon_features(tokens, feats):
     >>> sorted(feats.items())
     [('neg_words', 1), ('pos_words', 2)]
     """
-    ###TODO
-    pass
+    feats['neg_words'] = 0
+    feats['pos_words'] = 0
+    for token in tokens:
+        if token.lower() in neg_words:
+            feats['neg_words'] += 1
+        elif token.lower() in pos_words:
+            feats['pos_words'] += 1
 
 
 def featurize(tokens, feature_fns):
@@ -189,8 +212,11 @@ def featurize(tokens, feature_fns):
     >>> feats
     [('neg_words', 0), ('pos_words', 2), ('token=LOVE', 1), ('token=great', 1), ('token=i', 1), ('token=movie', 1), ('token=this', 1)]
     """
-    ###TODO
-    pass
+    features = defaultdict(lambda: 0)
+    for ffn in feature_fns:
+        ffn(tokens, features)
+
+    return sorted(features.items(), key=lambda x: x[0])
 
 
 def vectorize(tokens_list, feature_fns, min_freq, vocab=None):
