@@ -23,7 +23,7 @@ help.
 
 # No imports allowed besides these.
 from collections import Counter, defaultdict
-from itertools import chain, combinations
+from itertools import chain, combinations, permutations
 import glob
 import matplotlib.pyplot as plt
 import numpy as np
@@ -256,8 +256,30 @@ def vectorize(tokens_list, feature_fns, min_freq, vocab=None):
     >>> sorted(vocab.items(), key=lambda x: x[1])
     [('token=great', 0), ('token=horrible', 1), ('token=isn', 2), ('token=movie', 3), ('token=t', 4), ('token=this', 5)]
     """
-    ###TODO
-    pass
+    # feature_as_str -> [(doc_id, appear_cnt)]
+    ht = defaultdict(lambda: [])
+
+    for (i, tokens) in enumerate(tokens_list):
+        features = featurize(tokens, feature_fns)
+        # item's structure: feature_as_str -> appear_cnt
+        for item in features:
+            ht[item[0]].append((i, item[1]))
+
+    if vocab is None:
+        vocabList = sorted([item[0] for item in ht.items()])
+        vocab = defaultdict(lambda: 0)
+        for word in vocabList:
+            vocab[word] = len(vocab)
+
+    rowIndices, colIndices, values = [], [], []
+    for item in ht.items():
+        if len(item[1]) < min_freq: continue
+        for (id, cnt) in item[1]:
+            rowIndices.append(id)
+            colIndices.append(vocab[item[0]])
+            values.append(cnt)
+
+    return csr_matrix((values, (rowIndices, colIndices)), shape=(len(tokens_list), len(vocab))), vocab
 
 
 def accuracy_score(truth, predicted):
@@ -286,8 +308,15 @@ def cross_validation_accuracy(clf, X, labels, k):
       The average testing accuracy of the classifier
       over each fold of cross-validation.
     """
-    ###TODO
-    pass
+    kf = KFold(n_splits=k)
+    testAccuList = []
+    for trainIndices, testIndices in kf.split(X):
+        trainX, trainY = X[trainIndices], labels[trainIndices]
+        clf.fit(trainX, trainY)
+        predY = clf.predict(X[testIndices])
+        testAccuList.append(accuracy_score(labels[testIndices], predY))
+
+    return np.mean(testAccuList)
 
 
 def eval_all_combinations(docs, labels, punct_vals,
@@ -328,8 +357,22 @@ def eval_all_combinations(docs, labels, punct_vals,
 
       This function will take a bit longer to run (~20s for me).
     """
-    ###TODO
-    pass
+    results = []
+    for punt in punct_vals:
+        tokenList = [tokenize(d, keep_internal_punct=punt) for d in docs]
+        for min_freq in min_freqs:
+            for l in range(1, len(feature_fns) + 1):
+                for fn_comb in combinations(feature_fns, l):
+                    X, vocab = vectorize(tokenList, fn_comb, min_freq=min_freq)
+                    clf = LogisticRegression(solver='lbfgs',
+                                             multi_class='auto',
+                                             max_iter=1000)
+                    cvAccu = cross_validation_accuracy(clf, X, labels, 5)
+                    result = {'punct': punt, 'min_freq': min_freq,
+                              'features': fn_comb, 'accuracy': cvAccu}
+                    results.append(result)
+
+    return sorted(results, key=lambda x: x['accuracy'], reverse=True)
 
 
 def plot_sorted_accuracies(results):
@@ -472,6 +515,8 @@ def main():
                                     feature_fns,
                                     [2,5,10])
     # Print information about these results.
+    for result in results:
+        print('cross-validation result:\n%s' % str(result))
     best_result = results[0]
     worst_result = results[-1]
     print('best cross-validation result:\n%s' % str(best_result))
