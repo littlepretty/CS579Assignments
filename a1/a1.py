@@ -28,7 +28,9 @@ def example_graph():
     Do not modify.
     """
     g = nx.Graph()
-    g.add_edges_from([('A', 'B'), ('A', 'C'), ('B', 'C'), ('B', 'D'), ('D', 'E'), ('D', 'F'), ('D', 'G'), ('E', 'F'), ('G', 'F')])
+    g.add_edges_from([('A', 'B'), ('A', 'C'), ('B', 'C'),
+                      ('B', 'D'), ('D', 'E'), ('D', 'F'),
+                      ('D', 'G'), ('E', 'F'), ('G', 'F')])
     return g
 
 def bfs(graph, root, max_depth):
@@ -75,8 +77,29 @@ def bfs(graph, root, max_depth):
     >>> sorted((node, sorted(parents)) for node, parents in node2parents.items())
     [('B', ['D']), ('D', ['E']), ('F', ['E']), ('G', ['D', 'F'])]
     """
-    ###TODO
-    pass
+    q = deque()
+    node2dist = defaultdict(lambda: math.inf)
+    visited = defaultdict(lambda: False)  # If an edge has already been visited.
+    node2numPaths = defaultdict(lambda: 0)
+    node2parents = defaultdict(lambda: [])
+
+    q.append(root)
+    node2dist[root] = 0
+    node2numPaths[root] = 1
+    while len(q) > 0:
+        curr = q.pop()
+        for next in nx.all_neighbors(graph, curr):
+            # Extrac termination: root to curr already takes max_depth steps.
+            if node2dist[curr] == max_depth: continue
+            if visited[str(curr) + '->' + str(next)]: continue
+            visited[str(curr) + '->' + str(next)] = True
+            q.append(next)
+            if node2dist[next] >= node2dist[curr] + 1:
+                node2dist[next] = node2dist[curr] + 1
+                node2numPaths[next] += node2numPaths[curr]
+                node2parents[next].append(curr)
+
+    return node2dist, node2numPaths, node2parents
 
 
 def complexity_of_bfs(V, E, K):
@@ -91,8 +114,7 @@ def complexity_of_bfs(V, E, K):
     >>> type(v) == int or type(v) == float
     True
     """
-    ###TODO
-    pass
+    return len(V) + len(E)
 
 
 def bottom_up(root, node2distances, node2num_paths, node2parents):
@@ -130,8 +152,32 @@ def bottom_up(root, node2distances, node2num_paths, node2parents):
     >>> sorted(result.items())
     [(('A', 'B'), 1.0), (('B', 'C'), 1.0), (('B', 'D'), 3.0), (('D', 'E'), 4.5), (('D', 'G'), 0.5), (('E', 'F'), 1.5), (('F', 'G'), 0.5)]
     """
-    ###TODO
-    pass
+    orderedNodes = sorted(node2distances.items(), key=lambda x: x[1], reverse=True)
+    edge2credit = defaultdict(lambda: 0)
+    node2credit = defaultdict(lambda: 0)
+    node2children = defaultdict(lambda: [])
+    for (x, parents) in node2parents.items():
+        for p in parents:
+            node2children[p].append(x)
+
+    def sortedEdge(child, parent):
+        """Make edge (c, p) to be sorted alphabetically"""
+        return tuple(sorted([child, parent]))
+
+    for (x, level) in orderedNodes:
+        node2credit[x] = 1
+        for c in node2children[x]:
+            node2credit[x] += edge2credit[sortedEdge(c, x)]
+
+        normalizer = 0.0
+        for p in node2parents[x]:
+            edge2credit[sortedEdge(x, p)] = 1.0 * node2num_paths[p] * node2credit[x]
+            normalizer += node2num_paths[p]
+
+        for p in node2parents[x]:
+            edge2credit[sortedEdge(x, p)] /= normalizer
+
+    return edge2credit
 
 
 def approximate_betweenness(graph, max_depth):
@@ -155,8 +201,14 @@ def approximate_betweenness(graph, max_depth):
     >>> sorted(approximate_betweenness(example_graph(), 2).items())
     [(('A', 'B'), 2.0), (('A', 'C'), 1.0), (('B', 'C'), 2.0), (('B', 'D'), 6.0), (('D', 'E'), 2.5), (('D', 'F'), 2.0), (('D', 'G'), 2.5), (('E', 'F'), 1.5), (('F', 'G'), 1.5)]
     """
-    ###TODO
-    pass
+    betweenness = defaultdict(lambda: 0)
+    for x in graph.nodes():
+        node2distances, node2num_paths, node2parents = bfs(example_graph(), x, max_depth)
+        edge2credit = bottom_up(x, node2distances, node2num_paths, node2parents)
+        for (edge, credit) in edge2credit.items():
+            betweenness[edge] += credit / 2
+
+    return betweenness
 
 
 def get_components(graph):
@@ -196,8 +248,18 @@ def partition_girvan_newman(graph, max_depth):
     >>> sorted(components[1].nodes())
     ['D', 'E', 'F', 'G']
     """
-    ###TODO
-    pass
+    betweenness = sorted(approximate_betweenness(graph, max_depth).items(),
+                         key=lambda x: (x[1], x[0]), reverse=True)
+    for i in range(len(betweenness)):
+        copyGraph = graph.copy()
+        copyGraph.remove_edges_from([x[0] for x in betweenness[:i]])
+        components = get_components(copyGraph)
+        if len(components) > 1:
+            # print("Removing edges: %s" % betweenness[:i])
+            return components
+
+    return get_components(graph)
+
 
 def get_subgraph(graph, min_degree):
     """Return a subgraph containing nodes whose degree is
@@ -216,11 +278,13 @@ def get_subgraph(graph, min_degree):
     >>> len(subgraph.edges())
     2
     """
-    ###TODO
-    pass
+    degrees = nx.degree(graph, nx.nodes(graph))
+    removeList = [x[0] for x in degrees if x[1] < min_degree]
+    graph.remove_nodes_from(removeList)
+    return graph
 
 
-""""
+"""
 Compute the normalized cut for each discovered cluster.
 I've broken this down into the three next methods.
 """
@@ -237,8 +301,8 @@ def volume(nodes, graph):
     >>> volume(['A', 'B', 'C'], example_graph())
     4
     """
-    ###TODO
-    pass
+    coveredEdges = [e for e in nx.edges(graph) if e[0] in nodes or e[1] in nodes]
+    return len(coveredEdges)
 
 
 def cut(S, T, graph):
@@ -256,8 +320,11 @@ def cut(S, T, graph):
     >>> cut(['A', 'B', 'C'], ['D', 'E', 'F', 'G'], example_graph())
     1
     """
-    ###TODO
-    pass
+    def span(S, T, e):
+        return (e[0] in S and e[1] in T) or (e[1] in S and e[0] in T)
+
+    cutEdges = [e for e in nx.edges(graph) if span(S, T, e)]
+    return len(cutEdges)
 
 
 def norm_cut(S, T, graph):
@@ -271,8 +338,7 @@ def norm_cut(S, T, graph):
       An float representing the normalized cut value
 
     """
-    ###TODO
-    pass
+    return cut(S, T, graph) / volume(S, graph) + cut(S, T, graph) / volume(T, graph)
 
 
 def brute_force_norm_cut(graph, max_size):
@@ -287,7 +353,7 @@ def brute_force_norm_cut(graph, max_size):
         (unsorted) list of (score, edge_list) tuples, where
         score is the norm_cut score for each cut, and edge_list
         is the list of edges (source, target) for each cut.
-        
+
 
     Note: only return entries if removing the edges results in exactly
     two connected components.
