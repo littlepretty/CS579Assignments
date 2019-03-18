@@ -275,9 +275,10 @@ def vectorize(tokens_list, feature_fns, min_freq, vocab=None):
     for item in ht.items():
         if len(item[1]) < min_freq: continue
         for (id, cnt) in item[1]:
-            rowIndices.append(id)
-            colIndices.append(vocab[item[0]])
-            values.append(cnt)
+            if item[0] in vocab:
+                rowIndices.append(id)
+                colIndices.append(vocab[item[0]])
+                values.append(cnt)
 
     return csr_matrix((values, (rowIndices, colIndices)), shape=(len(tokens_list), len(vocab))), vocab
 
@@ -437,6 +438,7 @@ def fit_best_classifier(docs, labels, best_result):
                  for d in docs]
     X, vocab = vectorize(tokenList, best_result['features'],
                          min_freq=best_result['min_freq'])
+    print('Training set dimension:', X.shape)
     clf = LogisticRegression(solver='lbfgs', multi_class='auto', max_iter=1000)
     clf.fit(X, labels)
     return clf, vocab
@@ -500,8 +502,8 @@ def parse_test_data(best_result, vocab):
     tokenList = [tokenize(d, keep_internal_punct=best_result['punct'])
                  for d in test_docs]
     X_test, vocab = vectorize(tokenList, best_result['features'],
-                              min_freq=best_result['min_freq'],
-                              vocab=vocab)
+                              min_freq=best_result['min_freq'], vocab=vocab)
+    print('Testing set dimension:', X_test.shape)
     return test_docs, test_labels, X_test
 
 
@@ -533,19 +535,22 @@ def print_top_misclassified(test_docs, test_labels, X_test, clf, n):
     misclassified = []
     for (i, predict) in enumerate(predictions):
         if predict != test_labels[i]:
-            misclassified.append((i, predProb[i]))
+            misclassified.append((i, predProb[i][predict]))
 
     misclassified = sorted(misclassified, key=lambda x: x[1], reverse=True)
     if n > len(misclassified):
-        print('Misclassifed less than %d docs: %d' % (n, len(misclassified)))
+        print('#Misclassifed docs = %d/%d, less than requested n=%d' %
+              (len(misclassified), len(test_docs), n))
         topMisclassified = misclassified
     else:
+        print('#Misclassifed docs = %d/%d' % (len(misclassified), len(test_docs)))
         topMisclassified = misclassified[:n]
 
     for (id, prob) in topMisclassified:
-        print('truth=%d, predicted=%d, proba=%.6f\n' %
-              (label[id], predictions[id], predProb[id]))
+        print('truth=%d, predicted=%d, proba=%.6f' %
+              (test_labels[id], predictions[id], prob))
         print(test_docs[id])
+        print('\n')
 
 
 def main():
@@ -553,12 +558,12 @@ def main():
     Put it all together.
     ALREADY DONE.
     """
-    # feature_fns = [token_features, token_pair_features, lexicon_features]
-    # min_freqs = [2, 5, 10]
-    # punct_vals = [True, False]
-    feature_fns = [token_features]
-    min_freqs = [2]
-    punct_vals = [True]
+    feature_fns = [token_features, token_pair_features, lexicon_features]
+    min_freqs = [2, 5, 10]
+    punct_vals = [True, False]
+    # feature_fns = [token_features]
+    # min_freqs = [2]
+    # punct_vals = [True]
 
     # Download and read data.
     download_data()
@@ -579,7 +584,7 @@ def main():
     print('\n'.join(['%s: %.5f' % (s,v) for v,s in mean_accuracy_per_setting(results)]))
 
     # Fit best classifier.
-    clf, vocab = fit_best_classifier(docs, labels, results[0])
+    clf, vocab = fit_best_classifier(docs, labels, best_result)
 
     # Print top coefficients per class.
     print('\nTOP COEFFICIENTS PER CLASS:')
