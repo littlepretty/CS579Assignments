@@ -445,9 +445,12 @@ def make_training_graph(graph, test_node, n):
     >>> sorted(train_graph.neighbors('D'))
     ['F', 'G']
     """
-    ###TODO
-    pass
+    copyGraph = graph.copy()
+    neighbors = sorted(nx.all_neighbors(graph, test_node))
+    for next in neighbors[:n]:
+        copyGraph.remove_edge(test_node, next)
 
+    return copyGraph
 
 
 def jaccard(graph, node, k):
@@ -476,9 +479,15 @@ def jaccard(graph, node, k):
     >>> jaccard(train_graph, 'D', 2)
     [(('D', 'E'), 0.5), (('D', 'A'), 0.0)]
     """
-    ###TODO
-    pass
+    scores = []
+    X = set(nx.all_neighbors(graph, node))
+    for other in graph.nodes():
+        if other == node: continue
+        if (node, other) in graph.edges(): continue
+        Y = set(nx.all_neighbors(graph, other))
+        scores.append(((node, other), len(X & Y) * 1.0 / len(X | Y)))
 
+    return sorted(scores, key=lambda x: (-x[1], x[0][1]))[:k]
 
 
 def evaluate(predicted_edges, graph):
@@ -499,8 +508,12 @@ def evaluate(predicted_edges, graph):
     >>> evaluate([('D', 'E'), ('D', 'A')], example_graph())
     0.5
     """
-    ###TODO
-    pass
+    cnt = 0
+    for edge in predicted_edges:
+        if edge in graph.edges():
+            cnt += 1
+
+    return cnt * 1.0 / len(predicted_edges)
 
 
 """
