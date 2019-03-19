@@ -203,7 +203,7 @@ def approximate_betweenness(graph, max_depth):
     """
     betweenness = defaultdict(lambda: 0)
     for x in graph.nodes():
-        node2distances, node2num_paths, node2parents = bfs(example_graph(), x, max_depth)
+        node2distances, node2num_paths, node2parents = bfs(graph, x, max_depth)
         edge2credit = bottom_up(x, node2distances, node2num_paths, node2parents)
         for (edge, credit) in edge2credit.items():
             betweenness[edge] += credit / 2
@@ -371,10 +371,18 @@ def brute_force_norm_cut(graph, max_size):
     >>> sorted(r)[0]
     (0.41666666666666663, [('A', 'B'), ('B', 'D')])
     """
-    ###TODO
-    pass
+    results = []
+    for i in range(1, max_size + 1):
+        for edgeList in combinations(nx.edges(graph), i):
+            copyGraph = graph.copy()
+            copyGraph.remove_edges_from(edgeList)
+            components = get_components(copyGraph)
+            if len(components) != 2: continue
+            c1, c2 = components
+            score = norm_cut(nx.nodes(c1), nx.nodes(c2), graph)
+            results.append((score, list(edgeList)))
 
-
+    return results
 
 
 def score_max_depths(graph, max_depths):
@@ -394,8 +402,13 @@ def score_max_depths(graph, max_depths):
       norm_cut value obtained by the partitions returned by
       partition_girvan_newman. See Log.txt for an example.
     """
-    ###TODO
-    pass
+    results = []
+    for max_depth in max_depths:
+        S, T = partition_girvan_newman(graph, max_depth)
+        score = norm_cut(S, T, graph)
+        results.append((max_depth, score))
+
+    return results
 
 
 ## Link prediction
@@ -528,12 +541,11 @@ def main():
           (clusters[0].order(), clusters[1].order()))
     print('smaller cluster nodes:')
     print(sorted(clusters, key=lambda x: x.order())[0].nodes())
+
     test_node = 'Bill Gates'
     train_graph = make_training_graph(subgraph, test_node, 5)
     print('train_graph has %d nodes and %d edges' %
           (train_graph.order(), train_graph.number_of_edges()))
-
-
     jaccard_scores = jaccard(train_graph, test_node, 5)
     print('\ntop jaccard scores for Bill Gates:')
     print(jaccard_scores)
