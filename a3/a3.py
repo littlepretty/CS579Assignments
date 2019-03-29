@@ -54,8 +54,14 @@ def tokenize(movies):
     >>> movies['tokens'].tolist()
     [['horror', 'romance'], ['sci-fi']]
     """
-    ###TODO
-    pass
+    columnVals =[]
+    for index, row in movies.iterrows():
+        tokens = tokenize_string(str(row.genres))
+        columnVals.append(tokens)
+
+    tokenPd = pd.DataFrame({'tokens': columnVals})
+    movies = movies.join(tokenPd)
+    return movies
 
 
 def featurize(movies):
@@ -79,9 +85,21 @@ def featurize(movies):
       A tuple containing:
       - The movies DataFrame, which has been modified to include a column named 'features'.
       - The vocab, a dict from term to int. Make sure the vocab is sorted alphabetically as in a2 (e.g., {'aardvark': 0, 'boy': 1, ...})
+
+    >>> movies = pd.DataFrame([[123, 'Horror|Romance'], [456, 'Sci-Fi']], columns=['movieId', 'genres'])
+    >>> featurize(movies)
     """
-    ###TODO
-    pass
+    movies = tokenize(movies)
+    termSet = set()
+    for index, row in movies.iterrows():
+        for term in list(row.tokens):
+            termSet.add(term)
+
+    vocab = {word: index for index, word in enumerate(sorted(list(termSet)))}
+    tf = defaultdict(lambda: defaultdict(lambda: 0)) # term i + doc d -> freq of i in d
+    df = defaultdict(lambda: 0) # term i -> #docs that contains term i
+    maxtf = defaultdict(lambda: 0) # doc d -> max_k{tf[k][d]}
+
 
 
 def train_test_split(ratings):
